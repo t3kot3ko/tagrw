@@ -1,0 +1,87 @@
+#!/usr/bin/env ruby
+
+require "tagrw"
+require "thor"
+
+def fatal(message)
+	puts "FATAL: #{message}"
+	exit 1
+end
+
+class Cli < Thor
+	def initialize(*args)
+		super(*args)
+		@pwd = Dir.pwd
+	end
+
+	desc "show", "Just show main properties"
+	def show(*paths)
+		if paths.empty?
+			fatal "More than one file paths must be specified"
+		end
+
+		paths.each do |path|
+			next unless File.exists? path
+
+			if File.file?(path) && File.extname(path).downcase == ".mp3"
+				puts Tagrw.inspect(path).to_s
+			end
+		end
+	end
+
+	desc "f2t", "Rewrite tags based on file name in specified directory"
+	option :dry_run, type: :boolean, default: false, aliases: "-n"
+	option :artist, type: :string, required: :true
+	option :album, type: :string, required: :true
+	option :picture, type: :string, required: false
+	option :delimiter, aliases: "-d", type: :string, default: " "
+	option :index_only, type: :boolean, default: false
+	option :verbose, aliases: "v", type: :boolean, default: false
+	def n2t(dir=@pwd)
+		delimiter = options[:delimiter]
+		artist = options[:artist]
+		album = options[:album]
+
+		unless File.directory?(dir)
+			fatal "Specified path does not exist or is not a directory"
+		end
+
+		files = Dir.glob(File.join(dir, "*"))
+		valid_files = files.select{|f| Tagrw.valid_filename?(f, delimiter)}.sort
+
+		fatal "No valid file found" if valid_files.empty?
+
+		# the number of mp3 files
+		count = files.map{|f| File.basename(f).split(delimiter).first.to_i}.max
+
+		puts "Dryrun: " if options[:dry_run]
+
+		valid_files.each do |f|
+			index, *title = File.basename(f, File.extname(f)).split(delimiter)
+			track = options[:index_only] ? index.to_s : "#{index.to_i}/#{count}"
+
+			old_data = Tagrw.inspect(f)
+			new_data = Tagrw::Data.new(
+				f, 
+				track, 
+				artist, 
+				album, 
+				title.join(delimiter),
+				[options[:picture]].compact
+			)
+			
+			# Dryrun: just showing tag before/after rewritten
+			if options[:dry_run]
+				puts old_data.diff(new_data)
+			else
+				puts old_data.diff(new_data) if options[:verbose]
+				Tagrw.write_tag(new_data)
+			end
+		end
+	end
+end
+
+
+Cli.start(ARGV)
+
+
