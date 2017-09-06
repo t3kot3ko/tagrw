@@ -8,6 +8,10 @@ def fatal(message)
 	exit 1
 end
 
+def error(message)
+	puts "ERROR: #{message}"
+end
+
 class Cli < Thor
 	def initialize(*args)
 		super(*args)
@@ -76,6 +80,60 @@ class Cli < Thor
 			else
 				puts old_data.diff(new_data) if options[:verbose]
 				Tagrw.write_tag(new_data)
+			end
+		end
+	end
+
+
+	desc "t2f", "Rename based on mp3 tag"
+	option :dry_run, type: :boolean, default: false, aliases: "-n"
+	option :format, type: :string, default: "[TRACK:2] [TITLE]"
+	option :verbose, aliases: "v", type: :boolean, default: false
+	def t2f(*filepaths)
+		format = options[:format]
+
+		if format.include?("/")
+			fatal "Filename format cannot include slash '/'"
+		end
+
+		filepaths.each do |filepath|
+			unless File.file?(filepath)
+				error "File not found: #{filepath}"
+				next
+			end
+
+			unless File.extname(filepath).downcase == ".mp3"
+				error "Invalid file (only *.mp3 are supported)"
+				next
+			end
+
+			data = Tagrw.inspect(filepath)
+
+			puts "Dryrun: " if options[:dry_run]
+
+			parsed_format = format.scan(/\[(.*?)\]/).flatten
+
+			# track
+			if track_arg = parsed_format.find{|e| e =~ /TRACK/}
+				if digits = track_arg.split(":").last
+					digits
+					track = sprintf("%0#{digits}d", data.track.split("/").first.to_i)
+				else
+					track = sprintf("%d", data.track.split("/").first.to_i)
+				end
+			else
+				track = ""
+			end
+
+			new_filename = format
+				.gsub(/\[TRACK.*?\]/, track)		# slash conflicts with filepath
+				.gsub("[TITLE]", data.title) + ".mp3"
+
+			new_filepath = File.join(File.dirname(filepath), new_filename)
+			if options[:dry_run]
+				puts "#{filepath} => #{new_filepath}"
+			else
+				File.rename(filepath, new_filepath)
 			end
 		end
 	end
