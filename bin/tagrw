@@ -33,7 +33,7 @@ class Cli < Thor
 		end
 	end
 
-	desc "f2t", "Rewrite tags based on file name in specified directory"
+	desc "n2t", "Rewrite tags based on file name in specified directory"
 	option :dry_run, type: :boolean, default: false, aliases: "-n"
 	option :artist, type: :string, required: :true
 	option :album, type: :string, required: :true
@@ -85,11 +85,11 @@ class Cli < Thor
 	end
 
 
-	desc "t2f", "Rename based on mp3 tag"
+	desc "t2n", "Rename based on mp3 tag"
 	option :dry_run, type: :boolean, default: false, aliases: "-n"
 	option :format, type: :string, default: "[TRACK:2] [TITLE]"
 	option :verbose, aliases: "v", type: :boolean, default: false
-	def t2f(*filepaths)
+	def t2n(*filepaths)
 		format = options[:format]
 
 		if format.include?("/")
